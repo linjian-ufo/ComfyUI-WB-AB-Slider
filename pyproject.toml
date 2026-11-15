@@ -1,0 +1,17 @@
+[project]
+name = "comfyui-wb-ab-slider"
+description = "In-canvas draggable A/B image slider for ComfyUI: kernel-managed DOM widget, resizable, live results pushed from two IMAGE inputs."
+version = "1.0.0"
+requires-python = ">= 3.9"
+dependencies = []
+license = "MIT"
+
+[project.urls]
+Repository = "https://github.com/linjian-ufo/ComfyUI-WB-AB-Slider"
+Documentation = "https://github.com/linjian-ufo/ComfyUI-WB-AB-Slider#readme"
+Issues = "https://github.com/linjian-ufo/ComfyUI-WB-AB-Slider/issues"
+
+[tool.comfy]
+PublisherId = "linjian-ufo"
+DisplayName = "WB A/B Slider"
+Icon = ""

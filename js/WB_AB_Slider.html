@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A/B 滑块对比 · WB A/B Slider</title>
+<style>
+  :root { --split: 50%; --bg:#121417; --panel:#1c2026; --line:#333a44; --fg:#e8edf3; --dim:#8a94a2; --accent:#4ea1ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.6 "Segoe UI","Microsoft YaHei",sans-serif; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:14px 20px; background:var(--panel); border-bottom:1px solid var(--line); }
+  h1 { font-size:16px; margin:0 12px 0 0; font-weight:650; letter-spacing:.3px; }
+  .tag { color:var(--dim); font-size:12px; margin-right:auto; }
+  button { background:#2a313b; color:var(--fg); border:1px solid #3c4653; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  button:hover { background:#35404d; border-color:var(--accent); }
+  button.primary { background:#1d4e86; border-color:#2f6cb3; }
+  button.primary:hover { background:#2565ab; }
+  button.on { background:#1d5c3a; border-color:#2f8a55; }
+  .status { padding:8px 20px; color:var(--dim); font-size:12px; border-bottom:1px solid var(--line); word-break:break-all; }
+  .status b { color:#9fd0ff; font-weight:500; }
+  main { padding:18px 20px 26px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  #stage { position:relative; overflow:hidden; background:#000; border-radius:8px; border:1px solid #2b323c;
+           cursor:ew-resize; touch-action:none; outline:none; box-shadow:0 8px 30px rgba(0,0,0,.45); }
+  #stage:focus-visible { box-shadow:0 0 0 2px var(--accent); }
+  #stage img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none; user-select:none; -webkit-user-drag:none; }
+  #imgB { z-index:1; }
+  #imgA { z-index:2; clip-path: inset(0 calc(100% - var(--split)) 0 0); }
+  .label { position:absolute; top:12px; z-index:5; padding:4px 10px; border-radius:5px;
+           background:rgba(0,0,0,.62); border:1px solid rgba(255,255,255,.22); font-size:12px; font-weight:600; pointer-events:none; }
+  #labA { left:12px; } #labB { right:12px; }
+  #divider { position:absolute; top:0; bottom:0; left:var(--split); width:2px; background:#fff; z-index:4;
+             box-shadow:0 0 8px rgba(0,0,0,.75); pointer-events:none; }
+  #handle { position:absolute; left:var(--split); top:50%; z-index:6; transform:translate(-50%,-50%);
+            width:38px; height:38px; border-radius:50%; background:rgba(255,255,255,.95); color:#111;
+            display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700;
+            box-shadow:0 2px 10px rgba(0,0,0,.6); pointer-events:none; letter-spacing:-2px; }
+  .hint { color:var(--dim); font-size:12px; text-align:center; }
+  .hint kbd { background:#242a33; border:1px solid #3a434f; border-radius:4px; padding:1px 6px; color:#cfd8e3; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center; color:var(--dim); font-size:12px; }
+  .row input[type=text] { width:min(340px,72vw); background:#171b21; border:1px solid #39424e; color:var(--fg);
+                           border-radius:5px; padding:6px 8px; font-size:12px; }
+  .row label { display:flex; align-items:center; gap:4px; }
+  details { width:100%; max-width:980px; color:var(--dim); font-size:12px; }
+  summary { cursor:pointer; }
+  .empty { padding:60px 20px; text-align:center; color:var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>A / B 滑块对比</h1>
+  <span class="tag">节点外的独立对比页　·　自动读最近一次运行，也可手动选两张图</span>
+  <button class="primary" id="btnLatest">载入最新结果</button>
+  <button id="btnSwap">交换 A / B</button>
+  <button id="btnSide">并排模式</button>
+  <button id="btnReset">回到 50%</button>
+  <button id="btnOpenA">单独看 A</button>
+  <button id="btnOpenB">单独看 B</button>
+</header>
+<div class="status" id="status">正在读取 ComfyUI 运行历史…</div>
+
+<main>
+  <div id="stage" tabindex="0" aria-label="A/B 对比滑块">
+    <img id="imgB" alt="B">
+    <img id="imgA" alt="A">
+    <span class="label" id="labA">A</span>
+    <span class="label" id="labB">B</span>
+    <div id="divider"></div>
+    <div id="handle">‹ ›</div>
+  </div>
+
+  <div class="hint">
+    在图上 <b>按住鼠标左键左右拖动</b> 移动分割线；也可点一下图后用 <kbd>←</kbd> <kbd>→</kbd> 微调（按住 Shift 大步）。触屏可直接拖。
+  </div>
+
+  <div class="row">
+    <label>手动选 A <input type="file" id="fileA" accept="image/*"></label>
+    <label>手动选 B <input type="file" id="fileB" accept="image/*"></label>
+  </div>
+
+  <details>
+    <summary>高级：手动指定文件名 / 更多选项</summary>
+    <div class="row" style="margin-top:10px">
+      <label>A 文件名 <input type="text" id="nameA" placeholder="图片A.png"></label>
+      <label>B 文件名 <input type="text" id="nameB" placeholder="图片B.png"></label>
+      <button id="btnByName">按文件名载入</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span>也可直接用链接参数：<code>?a=文件名A&amp;b=文件名B</code></span>
+      <button id="btnNoPreview">切换：原图 / 压缩预览</button>
+    </div>
+  </details>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const BASE = (location.protocol === 'file:') ? 'http://127.0.0.1:8188' : '';
+// 通用版不绑定任何工作流前缀：直接取最近一次成功运行输出的前两张图。
+const PREFIX_A = [];
+const PREFIX_B = [];
+
+let state = { a: null, b: null, ar: 2/3, swapped: false, side: false, preview: true,
+              wA: 0, hA: 0, wB: 0, hB: 0 };
+
+function viewURL(info) {
+  if (!info) return '';
+  const q = new URLSearchParams();
+  q.set('filename', info.filename || info);
+  q.set('type', info.type || 'output');
+  if (info.subfolder) q.set('subfolder', info.subfolder);
+  if (state.preview) q.set('preview', 'webp');
+  q.set('rand', Math.random().toString());
+  return BASE + '/api/view?' + q.toString();
+}
+function setStatus(html) { $('status').innerHTML = html; }
+
+function collectImages(entry) {
+  const all = [];
+  for (const o of Object.values(entry.outputs || {})) {
+    for (const im of (o.images || [])) if (im && im.filename) all.push(im);
+  }
+  return all;
+}
+function pick(images, prefixes) {
+  let found = null;
+  for (const p of prefixes) {
+    const hits = images.filter(i => (i.filename || '').toLowerCase().startsWith(p.toLowerCase()));
+    if (hits.length) { found = hits[hits.length - 1]; break; }
+  }
+  return found;
+}
+
+async function loadLatest() {
+  setStatus('正在读取 ComfyUI 运行历史…');
+  try {
+    const r = await fetch(BASE + '/history?max_items=40', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const hist = await r.json();
+    let best = null;
+    for (const e of Object.values(hist).reverse()) {
+      if ((e.status && e.status.status_str) !== 'success') continue;
+      const ims = collectImages(e);
+      let a = pick(ims, PREFIX_A), b = pick(ims, PREFIX_B);
+      if (!a || !b) {
+        if (ims.length < 2) continue;
+        a = ims[0]; b = ims[1];
+      }
+      best = { a, b }; break;
+    }
+    if (!best) {
+      setStatus('⚠ 最近的运行历史里没找到两张输出图片。可以点上面的「手动选 A / B」，或在「高级」里填文件名。'
+                + '（请先跑一次工作流；若不是从 ComfyUI 页面打开本页，自动读取可能被浏览器拦截）');
+      return;
+    }
+    apply(best.a, best.b, 'ComfyUI 最近一次运行');
+  } catch (err) {
+    setStatus('⚠ 读取历史失败：' + err.message + '。请用「手动选 A / B」或「高级 → 按文件名载入」。'
+              + '注意请用 <b>http://127.0.0.1:8188/extensions/ComfyUI-WB-AB-Slider/WB_AB_Slider.html</b> 打开本页。');
+  }
+}
+
+function apply(a, b, source) {
+  state.a = a; state.b = b;
+  $('nameA').value = a.filename || a;
+  $('nameB').value = b.filename || b;
+  const ua = viewURL(a), ub = viewURL(b);
+  $('imgA').src = ua; $('imgB').src = ub;
+  setStatus('来源：<b>' + source + '</b>　|　A: <b>' + (a.filename || a) + '</b>　|　B: <b>' + (b.filename || b) + '</b>');
+  $('imgA').onload = () => { state.wA = $('imgA').naturalWidth; state.hA = $('imgA').naturalHeight; fit(); };
+  $('imgB').onload = () => { state.wB = $('imgB').naturalWidth; state.hB = $('imgB').naturalHeight; fit(); };
+  fit();
+}
+
+function fit() {
+  const w = state.wA || 2160, h = state.hA || 3240;
+  state.ar = w / h;
+  const availW = Math.max(320, window.innerWidth * 0.94);
+  const availH = Math.max(260, window.innerHeight - (state.side ? 250 : 220));
+  const s = Math.min(availW / w, availH / h);
+  const stage = $('stage');
+  if (state.side) {
+    stage.style.width = Math.round(Math.min(availW, w * s * 2)) + 'px';
+    stage.style.height = Math.round(h * Math.min(availW / (w * 2), availH / h)) + 'px';
+  } else {
+    stage.style.width = Math.round(w * s) + 'px';
+    stage.style.height = Math.round(h * s) + 'px';
+  }
+  render();
+}
+
+let split = 0.5;
+function render() {
+  const stage = $('stage');
+  const A = $('imgA'), B = $('imgB');
+  if (state.side) {
+    // 并排：两张各占一半宽度，各自等比缩放
+    A.style.clipPath = 'none'; B.style.clipPath = 'none';
+    A.style.width = '50%'; B.style.width = '50%';
+    A.style.left = '0'; B.style.left = '50%';
+    stage.style.setProperty('--split', '50%');
+  } else {
+    A.style.width = '100%'; B.style.width = '100%';
+    A.style.left = '0'; B.style.left = '0';
+    B.style.clipPath = 'none';
+    stage.style.setProperty('--split', (split * 100) + '%');
+    A.style.clipPath = 'inset(0 calc(100% - var(--split)) 0 0)';
+  }
+  const a = state.swapped ? 'B' : 'A';
+  const b = state.swapped ? 'A' : 'B';
+  $('labA').textContent = a; $('labB').textContent = b;
+  $('handle').style.display = state.side ? 'none' : 'flex';
+  $('divider').style.display = state.side ? 'none' : 'block';
+}
+
+function setSplit(v) { split = Math.max(0, Math.min(1, v)); render(); }
+function localSplit(clientX) {
+  const r = $('stage').getBoundingClientRect();
+  return (clientX - r.left) / r.width;
+}
+let dragging = false;
+const stage = $('stage');
+stage.addEventListener('pointerdown', (e) => {
+  if (state.side) return;
+  dragging = true; stage.setPointerCapture(e.pointerId); stage.focus();
+  setSplit(localSplit(e.clientX)); e.preventDefault();
+});
+stage.addEventListener('pointermove', (e) => { if (dragging && !state.side) setSplit(localSplit(e.clientX)); });
+stage.addEventListener('pointerup', () => { dragging = false; });
+stage.addEventListener('pointercancel', () => { dragging = false; });
+stage.addEventListener('keydown', (e) => {
+  const step = e.shiftKey ? 0.05 : 0.01;
+  if (e.key === 'ArrowLeft')  { setSplit(split - step); e.preventDefault(); }
+  if (e.key === 'ArrowRight') { setSplit(split + step); e.preventDefault(); }
+  if (e.key === 'Home')       { setSplit(0); e.preventDefault(); }
+  if (e.key === 'End')        { setSplit(1); e.preventDefault(); }
+});
+window.addEventListener('resize', fit);
+
+$('btnLatest').onclick = loadLatest;
+$('btnReset').onclick = () => setSplit(0.5);
+$('btnSwap').onclick = () => {
+  state.swapped = !state.swapped;
+  const t = state.a; state.a = state.b; state.b = t;
+  if (state.a) apply(state.a, state.b, state.swapped ? '已交换 A/B' : '已还原 A/B');
+  $('btnSwap').classList.toggle('on', state.swapped);
+};
+$('btnSide').onclick = () => {
+  state.side = !state.side;
+  $('btnSide').classList.toggle('on', state.side);
+  $('btnSide').textContent = state.side ? '滑块模式' : '并排模式';
+  fit();
+};
+$('btnOpenA').onclick = () => { if (state.a) window.open(viewURL(state.a), '_blank'); };
+$('btnOpenB').onclick = () => { if (state.b) window.open(viewURL(state.b), '_blank'); };
+$('btnByName').onclick = () => {
+  const a = $('nameA').value.trim(), b = $('nameB').value.trim();
+  if (!a || !b) { setStatus('请填两个文件名。'); return; }
+  apply({ filename: a }, { filename: b }, '手动文件名');
+};
+$('btnNoPreview').onclick = () => {
+  state.preview = !state.preview;
+  $('btnNoPreview').textContent = state.preview ? '切换：原图 / 压缩预览' : '当前：原图（点此切回压缩预览）';
+  if (state.a) apply(state.a, state.b, state.preview ? '压缩预览' : '原图');
+};
+$('fileA').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const url = URL.createObjectURL(f);
+  $('imgA').src = url; $('imgA').onload = () => { state.wA = $('imgA').naturalWidth; state.hA = $('imgA').naturalHeight; fit(); };
+  setStatus('A 已手动载入：<b>' + f.name + '</b>');
+};
+$('fileB').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  $('imgB').src = URL.createObjectURL(f);
+  setStatus('B 已手动载入：<b>' + f.name + '</b>');
+};
+
+// URL 参数优先：?a=xxx&b=xxx
+const qp = new URLSearchParams(location.search);
+if (qp.get('a') && qp.get('b')) {
+  const a = { filename: qp.get('a') }, b = { filename: qp.get('b') };
+  if (qp.get('type')) { a.type = qp.get('type'); b.type = qp.get('type'); }
+  apply(a, b, 'URL 参数');
+} else {
+  loadLatest();
+}
+render();
+</script>
+</body>
+</html>
